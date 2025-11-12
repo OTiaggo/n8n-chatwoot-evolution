@@ -1,0 +1,116 @@
+version: '3.9'
+
+networks:
+  local_net:
+    driver: bridge
+
+volumes:
+  n8n_data:
+  evolution_instances:
+  evolution_store:
+  evolution_postgres_data:
+  evolution_redis_data:
+  chatwoot_postgres_data:
+  chatwoot_redis_data:
+  chatwoot_uploads:
+
+services:
+
+  # n8n service
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    networks:
+      - local_net
+    volumes:
+      - n8n_data:/home/node/.n8n
+    environment:
+      - NODE_ENV=production
+      - N8N_PORT=5678
+      - N8N_HOST=localhost
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=senhaSegura
+      - TZ=America/Fortaleza
+
+  # Evolution API service
+  evolution-api:
+    image: atendai/evolution-api:v2.1.1
+    container_name: evolution_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - local_net
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+    env_file:
+      - ./evolution.env
+    depends_on:
+      - evolution-db
+      - evolution-redis
+
+  evolution-db:
+    image: postgres:15
+    container_name: evolution_db
+    restart: unless-stopped
+    networks:
+      - local_net
+    environment:
+      - POSTGRES_USER=evo_user
+      - POSTGRES_PASSWORD=evo_pwd
+      - POSTGRES_DB=evolution
+    volumes:
+      - evolution_postgres_data:/var/lib/postgresql/data
+
+  evolution-redis:
+    image: redis:7
+    container_name: evolution_redis
+    restart: unless-stopped
+    networks:
+      - local_net
+    volumes:
+      - evolution_redis_data:/data
+
+  # Chatwoot service (self-hosted)
+  chatwoot-postgres:
+    image: postgres:15
+    container_name: chatwoot_postgres
+    restart: unless-stopped
+    networks:
+      - local_net
+    environment:
+      - POSTGRES_USER=chatwoot
+      - POSTGRES_PASSWORD=chatpwd
+      - POSTGRES_DB=chatwoot_production
+    volumes:
+      - chatwoot_postgres_data:/var/lib/postgresql/data
+
+  chatwoot-redis:
+    image: redis:7
+    container_name: chatwoot_redis
+    restart: unless-stopped
+    networks:
+      - local_net
+    volumes:
+      - chatwoot_redis_data:/data
+
+  chatwoot:
+    image: chatwoot/chatwoot:latest
+    container_name: chatwoot_app
+    restart: unless-stopped
+    networks:
+      - local_net
+    ports:
+      - "3000:3000"
+    depends_on:
+      - chatwoot-postgres
+      - chatwoot-redis
+    env_file:
+      - ./chatwoot.env
+    volumes:
+      - chatwoot_uploads:/app/uploads
