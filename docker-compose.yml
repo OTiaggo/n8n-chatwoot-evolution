@@ -1,22 +1,73 @@
-version: '3.9'
-
-networks:
-  local_net:
-    driver: bridge
-
-volumes:
-  n8n_data:
-  evolution_instances:
-  evolution_store:
-  evolution_postgres_data:
-  evolution_redis_data:
-  chatwoot_postgres_data:
-  chatwoot_redis_data:
-  chatwoot_uploads:
+version: '3'
 
 services:
+  # Chatwood
+  base: &base
+    image: chatwoot/chatwoot:latest
+    env_file: .env 
+    volumes:
+      - storage_data:/app/storage
+    networks:
+      - local_net
 
-  # n8n service
+  rails:
+    <<: *base
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+    entrypoint: docker/entrypoints/rails.sh
+    command: ['bundle', 'exec', 'rails', 's', '-p', '3000', '-b', '0.0.0.0']
+    restart: always
+    networks:
+      - local_net
+
+  sidekiq:
+    <<: *base
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+    command: ['bundle', 'exec', 'sidekiq', '-C', 'config/sidekiq.yml']
+    restart: always
+    networks:
+      - local_net
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: always
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=chatwoot
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    networks:
+      - local_net
+
+  redis:
+    image: redis:alpine
+    restart: always
+    command: ["sh", "-c", "redis-server --requirepass \"$REDIS_PASSWORD\""]
+    env_file: .env
+    volumes:
+      - redis_data:/data
+    ports:
+      - '6379:6379'
+    networks:
+      - local_net
+
+  # N8N serice 
   n8n:
     image: n8nio/n8n:latest
     container_name: n8n
@@ -27,18 +78,11 @@ services:
       - local_net
     volumes:
       - n8n_data:/home/node/.n8n
-    environment:
-      - NODE_ENV=production
-      - N8N_PORT=5678
-      - N8N_HOST=localhost
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=admin
-      - N8N_BASIC_AUTH_PASSWORD=senhaSegura
-      - TZ=America/Fortaleza
+    env_file:
+      - .env
 
-  # Evolution API service
   evolution-api:
-    image: atendai/evolution-api:v2.1.1
+    image: atendai/evolution-api
     container_name: evolution_api
     restart: unless-stopped
     ports:
@@ -49,68 +93,21 @@ services:
       - evolution_instances:/evolution/instances
       - evolution_store:/evolution/store
     env_file:
-      - ./evolution.env
+      - .env
     depends_on:
-      - evolution-db
-      - evolution-redis
+      - postgres
+      - redis
 
-  evolution-db:
-    image: postgres:15
-    container_name: evolution_db
-    restart: unless-stopped
-    networks:
-      - local_net
-    environment:
-      - POSTGRES_USER=evo_user
-      - POSTGRES_PASSWORD=evo_pwd
-      - POSTGRES_DB=evolution
-    volumes:
-      - evolution_postgres_data:/var/lib/postgresql/data
+networks:
+  local_net:
+    driver: bridge
 
-  evolution-redis:
-    image: redis:7
-    container_name: evolution_redis
-    restart: unless-stopped
-    networks:
-      - local_net
-    volumes:
-      - evolution_redis_data:/data
-
-  # Chatwoot service (self-hosted)
-  chatwoot-postgres:
-    image: postgres:15
-    container_name: chatwoot_postgres
-    restart: unless-stopped
-    networks:
-      - local_net
-    environment:
-      - POSTGRES_USER=chatwoot
-      - POSTGRES_PASSWORD=chatpwd
-      - POSTGRES_DB=chatwoot_production
-    volumes:
-      - chatwoot_postgres_data:/var/lib/postgresql/data
-
-  chatwoot-redis:
-    image: redis:7
-    container_name: chatwoot_redis
-    restart: unless-stopped
-    networks:
-      - local_net
-    volumes:
-      - chatwoot_redis_data:/data
-
-  chatwoot:
-    image: chatwoot/chatwoot:latest
-    container_name: chatwoot_app
-    restart: unless-stopped
-    networks:
-      - local_net
-    ports:
-      - "3000:3000"
-    depends_on:
-      - chatwoot-postgres
-      - chatwoot-redis
-    env_file:
-      - ./chatwoot.env
-    volumes:
-      - chatwoot_uploads:/app/uploads
+volumes:
+  n8n_data:
+  #chatwood
+  storage_data:
+  postgres_data:
+  redis_data:
+  #evolution
+  evolution_instances:
+  evolution_store:
