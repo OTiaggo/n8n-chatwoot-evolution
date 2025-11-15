@@ -81,8 +81,9 @@ services:
     env_file:
       - .env
 
+  # Evolution
   evolution-api:
-    image: atendai/evolution-api
+    image: atendai/evolution-api:v2.1.1
     container_name: evolution_api
     restart: unless-stopped
     ports:
@@ -91,12 +92,26 @@ services:
       - local_net
     volumes:
       - evolution_instances:/evolution/instances
-      - evolution_store:/evolution/store
     env_file:
       - .env
     depends_on:
-      - postgres
+      - postgres_evolution
       - redis
+
+  postgres_evolution:
+    image: postgres:16
+    restart: always
+    command: ["postgres", "-p", "5434"]
+    ports:
+      - '5434:5434'
+    networks:
+      - local_net
+    volumes:
+      - postgres_evolution:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=evolution
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
 
 networks:
   local_net:
@@ -110,4 +125,4 @@ volumes:
   redis_data:
   #evolution
   evolution_instances:
-  evolution_store:
+  postgres_evolution:
