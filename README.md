@@ -6,3 +6,12 @@
   docker compose run --rm rails bundle exec rails db:chatwoot_prepare
   docker compose up
   ```
+
+- Ou simplesmente rode o script bash:
+```bash
+#De a devia permissão para o comando
+chmod -x script.bash
+
+#Rode o script
+bash script.bash
+```
