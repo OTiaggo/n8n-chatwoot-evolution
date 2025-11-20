@@ -1,0 +1,229 @@
+version: '3'
+
+services:
+  rails:
+    image: 'ghcr.io/fazer-ai/chatwoot:latest'
+    pull_policy: always
+    volumes:
+      - 'storage:/app/storage'
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+      - DEFAULT_LOCALE=pt_BR
+      - FRONTEND_URL=${FRONTEND_URL}
+      - INTERNAL_HOST_URL=http://rails:3000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USERNAME=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DATABASE=${POSTGRES_DB:-chatwoot_production}
+      - SECRET_KEY_BASE=${SERVICE_PASSWORD_64_SECRETKEYBASE}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME=${BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME}
+      - BAILEYS_PROVIDER_DEFAULT_URL=http://baileys-api:3025
+      - BAILEYS_PROVIDER_DEFAULT_API_KEY=${SERVICE_PASSWORD_64_BAILEYSDEFAULTAPIKEY}
+      - BAILEYS_PROVIDER_USE_INTERNAL_HOST_URL=true
+    entrypoint: docker/entrypoints/rails.sh
+    command:
+      - bundle
+      - exec
+      - rails
+      - s
+      - '-p'
+      - '3000'
+      - '-b'
+      - 0.0.0.0
+    restart: always
+    ports:
+      - '3000:3000'
+    post_start:
+      - command:
+          - bundle
+          - exec
+          - rails
+          - db:chatwoot_prepare
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget -qO- --header="Accept: text/html" http://127.0.0.1:3000/'
+      interval: 60s
+      timeout: 20s
+      retries: 10
+
+  sidekiq:
+    image: 'ghcr.io/fazer-ai/chatwoot:latest'
+    pull_policy: always
+    volumes:
+      - 'storage:/app/storage'
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - NODE_ENV=production
+      - RAILS_ENV=production
+      - INSTALLATION_ENV=docker
+      - DEFAULT_LOCALE=pt_BR
+      - FRONTEND_URL=${FRONTEND_URL}
+      - INTERNAL_HOST_URL=http://rails:3000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USERNAME=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DATABASE=${POSTGRES_DB:-chatwoot_production}
+      - SECRET_KEY_BASE=${SERVICE_PASSWORD_64_SECRETKEYBASE}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME=${BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME}
+      - BAILEYS_PROVIDER_DEFAULT_URL=http://baileys-api:3025
+      - BAILEYS_PROVIDER_DEFAULT_API_KEY=${SERVICE_PASSWORD_64_BAILEYSDEFAULTAPIKEY}
+      - BAILEYS_PROVIDER_USE_INTERNAL_HOST_URL=true
+    command:
+      - bundle
+      - exec
+      - sidekiq
+      - '-C'
+      - config/sidekiq.yml
+    restart: always
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'ps aux | grep [s]idekiq'
+      interval: 20s
+      timeout: 20s
+      retries: 10
+
+  postgres:
+    image: 'pgvector/pgvector:pg16'
+    restart: always
+    volumes:
+      - 'postgres:/var/lib/postgresql/data'
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-chatwoot_production}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -h localhost -p 5432 -U $${POSTGRES_USER} -d $${POSTGRES_DB}'
+      interval: 20s
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: 'redis:alpine'
+    restart: always
+    command:
+      - sh
+      - '-c'
+      - 'redis-server --requirepass "${SERVICE_PASSWORD_REDIS}"'
+    volumes:
+      - 'redis:/data'
+    environment:
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'redis-cli -h localhost -p 6379 -a $${REDIS_PASSWORD} ping'
+      interval: 20s
+      timeout: 20s
+      retries: 10
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  baileys-api:
+    image: "ghcr.io/fazer-ai/baileys-api:latest"
+    pull_policy: always
+    volumes:
+      - "storage:/app/storage"
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - BAILEYS_LOG_LEVEL=${BAILEYS_LOG_LEVEL:-error}
+      - BAILEYS_PROVIDER_DEFAULT_API_KEY=${SERVICE_PASSWORD_64_BAILEYSDEFAULTAPIKEY}
+    command:
+      - sh
+      - "-c"
+      - "bun manage-api-keys create user ${SERVICE_PASSWORD_64_BAILEYSDEFAULTAPIKEY} && bun start"
+    restart: always
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget -qO- http://localhost:3025/status"
+      interval: 20s
+      timeout: 20s
+      retries: 10
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+#   #N8N
+#   n8n:
+#     image: n8nio/n8n:latest
+#     container_name: n8n
+#     restart: unless-stopped
+#     ports:
+#       - "5678:5678"
+#     networks:
+#       - local_net
+#     volumes:
+#       - n8n_data:/home/node/.n8n
+#     env_file:
+#       - .env
+#     extra_hosts:
+#       - "host.docker.internal:host-gateway"
+
+#   # Evolution
+#   evolution-api:
+#     image: atendai/evolution-api:v2.1.1
+#     container_name: evolution_api
+#     restart: unless-stopped
+#     ports:
+#       - "8080:8080"
+#     networks:
+#       - local_net
+#     volumes:
+#       - evolution_instances:/evolution/instances
+#     env_file:
+#       - .env
+#     depends_on:
+#       - postgres_evolution
+#       - redis
+#     extra_hosts:
+#       - "host.docker.internal:host-gateway"
+
+#   postgres_evolution:
+#     image: postgres:16
+#     restart: always
+#     command: ["postgres", "-p", "5434"]
+#     ports:
+#       - '5434:5434'
+#     networks:
+#       - local_net
+#     volumes:
+#       - postgres_evolution:/var/lib/postgresql/data
+#     environment:
+#       - POSTGRES_DB=evolution
+#       - POSTGRES_USER=postgres
+#       - POSTGRES_PASSWORD=password
+
+# networks:
+#   local_net:
+#     driver: bridge
+
+# volumes:
+#   n8n_data:
+#   #chatwood
+#   storage:
+#   #evolution
+#   evolution_instances:
+#   postgres_evolution:

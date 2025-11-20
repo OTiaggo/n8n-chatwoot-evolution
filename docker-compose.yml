@@ -9,6 +9,9 @@ services:
       - storage_data:/app/storage
     networks:
       - local_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "n8n.com:n8n"
 
   rails:
     <<: *base
@@ -21,11 +24,16 @@ services:
       - NODE_ENV=production
       - RAILS_ENV=production
       - INSTALLATION_ENV=docker
+      - ALLOW_INSECURE_WEBHOOKS=true
+      - FORCE_SSL=false
     entrypoint: docker/entrypoints/rails.sh
     command: ['bundle', 'exec', 'rails', 's', '-p', '3000', '-b', '0.0.0.0']
     restart: always
     networks:
       - local_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "n8n.com:n8n"
 
   sidekiq:
     <<: *base
@@ -36,10 +44,16 @@ services:
       - NODE_ENV=production
       - RAILS_ENV=production
       - INSTALLATION_ENV=docker
+      - ALLOW_INSECURE_WEBHOOKS=true
+      - FORCE_SSL=false
     command: ['bundle', 'exec', 'sidekiq', '-C', 'config/sidekiq.yml']
     restart: always
     networks:
       - local_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "n8n.com:n8n"
+
 
   postgres:
     image: pgvector/pgvector:pg16
@@ -80,6 +94,8 @@ services:
       - n8n_data:/home/node/.n8n
     env_file:
       - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # Evolution
   evolution-api:
@@ -97,6 +113,8 @@ services:
     depends_on:
       - postgres_evolution
       - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   postgres_evolution:
     image: postgres:16
