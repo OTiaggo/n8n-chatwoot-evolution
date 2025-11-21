@@ -1,16 +1,18 @@
 version: '3'
 
-x-base: &base
-  image: chatwoot/chatwoot:latest
-  env_file: .env 
-  volumes:
-    - storage_data:/app/storage
-  networks:
-    - local_net
-  extra_hosts:
-    - "host.docker.internal:host-gateway"
-
 services:
+  # Chatwood
+  base: &base
+    image: chatwoot/chatwoot:latest
+    env_file: .env 
+    volumes:
+      - storage_data:/app/storage
+    networks:
+      - local_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "n8n.com:n8n"
+
   rails:
     <<: *base
     depends_on:
@@ -27,6 +29,11 @@ services:
     entrypoint: docker/entrypoints/rails.sh
     command: ['bundle', 'exec', 'rails', 's', '-p', '3000', '-b', '0.0.0.0']
     restart: always
+    networks:
+      - local_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "n8n.com:n8n"
 
   sidekiq:
     <<: *base
@@ -41,7 +48,12 @@ services:
       - FORCE_SSL=false
     command: ['bundle', 'exec', 'sidekiq', '-C', 'config/sidekiq.yml']
     restart: always
- 
+    networks:
+      - local_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "n8n.com:n8n"
+
 
   postgres:
     image: pgvector/pgvector:pg16
@@ -72,7 +84,7 @@ services:
   # N8N serice 
   n8n:
     image: n8nio/n8n:latest
-    container_name: n8n
+    container_name: n8n.com
     restart: unless-stopped
     ports:
       - "5678:5678"
