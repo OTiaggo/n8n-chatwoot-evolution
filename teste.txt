@@ -1,0 +1,19 @@
+1. Agente no whatsapp com integração mcp com a plataforma financeira ContaAzul. O agente no whatsapp consegue puxar os dados do usuário da plataforma ContaAzul
+
+2. Plataforma para recebimento de pedidos via whatsapp. Conta com o agente de IA no whatsapp e uma plataforma para verificar os pedidos que chegam do agente.
+
+3. Fluxo que recebe dados de sensores IoT que trazem informações como a temperatura, umidade e se é um alerta. Caso seja um alerta as informações são passadas para um agente de triagem que classifica os dados em: nivel de urgencia, categoria, ação recomendada. Todos esses dados são passados para outro agente que sintetiza todas essas ifnormações em um texto humanizado para os gestores. Há também um endpoint que gera um relatório automático dos últimos alarmes registrados no sistema, retornando uma tabela com os dados, inclusive aqueles gerados por IA.
+
+4. Agente com RAG, capaz de ler pdf's e responder com bases no conteúdo contido nesses pdf'se
+
+5. Agentes com integração MCP no geral, com qualquer sistema que possua API.
+
+6. Integração com serviços do google, como calendario, email, drive. 
+
+7. Gerenciamento e triagem de mensagens, escalando mensagens que são repassadas da IA para humanos, podendo ser distribuida entre times de pessoas que vão tomar controle da conversa.
+
+8. Agente para suporte, onde a conversa é repassada para um humano quando o cliente não consegue ter a dúvida sanada pelo agente ou quando é preciso executar alguma ação no sistema.
+
+9. Agente para agendamento de consultas para consultório odontológico. Conta tambḿ com um agente que manda mensagem confirmando as consultas do dia posterior.
+
+10. Modelo de machine learning para predição de atestados inconsistentes.
